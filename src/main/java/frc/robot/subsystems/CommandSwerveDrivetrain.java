@@ -17,12 +17,14 @@ import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
+import edu.wpi.first.wpilibj.smartdashboard.Field2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
-
+import frc.robot.RobotContainer;
 import frc.robot.generated.TunerConstants.TunerSwerveDrivetrain;
 
 /**
@@ -40,6 +42,9 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private static final Rotation2d kRedAlliancePerspectiveRotation = Rotation2d.k180deg;
     /* Keep track if we've ever applied the operator perspective before or not */
     private boolean m_hasAppliedOperatorPerspective = false;
+
+    private final Field2d field = new Field2d();
+    private Pose2d startingRobotPose = null;
 
     /* Swerve requests to apply during SysId characterization */
     private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
@@ -235,6 +240,9 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
                 m_hasAppliedOperatorPerspective = true;
             });
         }
+
+        field.setRobotPose(getPose());
+        SmartDashboard.putData("Field", field);
     }
 
     private void startSimThread() {
@@ -285,4 +293,32 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     ) {
         super.addVisionMeasurement(visionRobotPoseMeters, Utils.fpgaToCurrentTime(timestampSeconds), visionMeasurementStdDevs);
     }
+
+    public Pose2d getPose() {
+        return this.getState().Pose;
+    }
+
+    public void setStartingPose() {
+        startingRobotPose = getPose();
+    }
+
+    public Pose2d getStartingPose() {
+        return startingRobotPose;
+    }
+
+    public double[] calculateDriveToPose(Pose2d targetPose, double maxSpeed) {
+        Pose2d current = getPose();
+        double dx = targetPose.getX() - current.getX();
+        double dy = targetPose.getY() - current.getY();
+    
+        double distance = Math.hypot(dx, dy);
+        if (distance < 0.01) {
+            return null; // close enough, we can brake
+        }
+    
+        double vx = dx / distance * Math.min(distance, maxSpeed);
+        double vy = dy / distance * Math.min(distance, maxSpeed);
+    
+        return new double[]{vx, vy}; // just return the velocities
+    }    
 }
