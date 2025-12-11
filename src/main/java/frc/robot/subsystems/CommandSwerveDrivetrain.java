@@ -44,7 +44,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private boolean m_hasAppliedOperatorPerspective = false;
 
     private final Field2d field = new Field2d();
-    private Pose2d startingRobotPose = null;
+    public final Pose2d startingRobotPose = getPose();
 
     /* Swerve requests to apply during SysId characterization */
     private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
@@ -295,30 +295,30 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     }
 
     public Pose2d getPose() {
+        //System.out.println(this.getState().Pose);
+        SmartDashboard.putString("Robot pos yes: ", this.getState().Pose.toString());
         return this.getState().Pose;
     }
 
-    public void setStartingPose() {
-        startingRobotPose = getPose();
-    }
-
     public Pose2d getStartingPose() {
-        return startingRobotPose;
+        return this.startingRobotPose;
     }
 
-    public double[] calculateDriveToPose(Pose2d targetPose, double maxSpeed) {
+    public double[] calculateDriveToPose(Pose2d targetPose) {
+        if (targetPose == null) return new double[]{0.0};
         Pose2d current = getPose();
         double dx = targetPose.getX() - current.getX();
         double dy = targetPose.getY() - current.getY();
-    
+        double dr = targetPose.getRotation().getRadians() - current.getRotation().getRadians();
         double distance = Math.hypot(dx, dy);
-        if (distance < 0.01) {
+        SmartDashboard.putNumber("dist", distance);
+        if (distance < 0.1) {
             return null; // close enough, we can brake
         }
     
-        double vx = dx / distance * Math.min(distance, maxSpeed);
-        double vy = dy / distance * Math.min(distance, maxSpeed);
+        double vx = dx / distance;
+        double vy = dy / distance;
     
-        return new double[]{vx, vy}; // just return the velocities
+        return new double[]{vx, vy, dr}; // just return the velocities
     }    
 }

@@ -9,7 +9,9 @@ import static edu.wpi.first.units.Units.*;
 import com.ctre.phoenix6.swerve.SwerveModule.DriveRequestType;
 import com.ctre.phoenix6.swerve.SwerveRequest;
 
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
@@ -61,19 +63,25 @@ public class RobotContainer {
             drivetrain.applyRequest(() -> idle).ignoringDisable(true)
         );
 
-        joystick.a().whileTrue(Commands.run(() -> {
-            double[] vel = drivetrain.calculateDriveToPose(drivetrain.getStartingPose(), MaxSpeed);
-            if (vel == null) {
-                drivetrain.applyRequest(() -> new SwerveRequest.SwerveDriveBrake());
-            } else {
-                drivetrain.applyRequest(() ->
-                    drive.withVelocityX(vel[0])
-                         .withVelocityY(vel[1])
-                         .withRotationalRate(0)
-                );
-            }
-        }));
-        
+
+        joystick.a().whileTrue(
+            drivetrain.applyRequest(() -> {
+                Pose2d start = drivetrain.getStartingPose();
+                if (start == null) return drive.withVelocityX(0).withVelocityY(0);
+
+                double[] vel = drivetrain.calculateDriveToPose(start);
+                if (vel == null) return brake;
+
+                SmartDashboard.putNumber("x", vel[0]);
+                SmartDashboard.putNumber("y", vel[1]);
+                SmartDashboard.putNumber("r", vel[2]);
+
+                return drive.withVelocityX(vel[0] * MaxSpeed/2)
+                            .withVelocityY(vel[1] * MaxSpeed/2)
+                            .withRotationalRate(vel[2] * MaxAngularRate);
+            })
+        );
+
 
         // joystick.a().whileTrue(drivetrain.applyRequest(() -> brake));
         // joystick.b().whileTrue(drivetrain.applyRequest(() ->
@@ -90,7 +98,7 @@ public class RobotContainer {
         // reset the field-centric heading on left bumper press
         joystick.leftBumper().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
 
-        drivetrain.registerTelemetry(logger::telemeterize);
+        // drivetrain.registerTelemetry(logger::telemeterize);
     }
 
     public Command getAutonomousCommand() {
