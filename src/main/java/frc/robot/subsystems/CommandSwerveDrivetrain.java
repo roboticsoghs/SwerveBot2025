@@ -22,6 +22,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import frc.robot.RobotContainer;
@@ -312,7 +313,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         double dr = targetPose.getRotation().getRadians() - current.getRotation().getRadians();
         double distance = Math.hypot(dx, dy);
         SmartDashboard.putNumber("dist", distance);
-        if (distance < 0.1) {
+        // if (dr < )
+        if (distance < 0.05) {
             return null; // close enough, we can brake
         }
     
@@ -320,5 +322,5 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         double vy = dy / distance;
     
         return new double[]{vx, vy, dr}; // just return the velocities
-    }    
+    }
 }
