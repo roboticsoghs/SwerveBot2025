@@ -11,8 +11,10 @@ import com.ctre.phoenix6.swerve.SwerveRequest;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
@@ -20,23 +22,23 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
 import frc.robot.commands.DriveDistance;
+import frc.robot.commands.DriveToPoseCommand;
 import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 public class RobotContainer {
-    private double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * 0.5; // kSpeedAt12Volts desired top speed
-    private double MaxAngularRate = RotationsPerSecond.of(0.5).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
+    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * 0.5; // kSpeedAt12Volts desired top speed
+    public double MaxAngularRate = RotationsPerSecond.of(0.5).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
     /* Setting up bindings for necessary control of the swerve drive platform */
-    private final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
+    public final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
             .withDeadband(MaxSpeed * 0.1).withRotationalDeadband(MaxAngularRate * 0.1) // Add a 10% deadband
             .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
-    private final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
-    private final SwerveRequest.PointWheelsAt point = new SwerveRequest.PointWheelsAt();
+    public final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
 
     private final Telemetry logger = new Telemetry(MaxSpeed);
 
-    private final CommandXboxController joystick = new CommandXboxController(0);
+    public final CommandXboxController joystick = new CommandXboxController(0);
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
 
@@ -102,7 +104,16 @@ public class RobotContainer {
     }
 
     public Command getAutonomousCommand() {
-        return new DriveDistance(drivetrain, 0.2, 2, MaxSpeed, MaxAngularRate);
+        return Commands.sequence(
+          new DriveToPoseCommand(drivetrain, drive, brake, -1, 0, 0, MaxSpeed, MaxAngularRate), // backward 0.5m
+          new DriveToPoseCommand(drivetrain, drive, brake, 0, -1, 0, MaxSpeed, MaxAngularRate), // move right 0.5m
+          new DriveToPoseCommand(drivetrain, drive, brake, 1, 0, 0, MaxSpeed, MaxAngularRate), // move forward 0.5m
+          new DriveToPoseCommand(drivetrain, drive, brake, 0, 1, 0, MaxSpeed, MaxAngularRate) // move left 0.5m
+        );
+
+        // return new DriveToPoseCommand(drivetrain, drive, brake, 1, 0, 0, MaxSpeed, MaxAngularRate);
+
+        // return new DriveDistance(drivetrain, 0.2, 2, MaxSpeed, MaxAngularRate);
 
         // return new SequentialCommandGroup(
         //   new InstantCommand(() -> driveDistance(1))  
