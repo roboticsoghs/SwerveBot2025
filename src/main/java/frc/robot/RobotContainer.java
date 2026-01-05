@@ -12,12 +12,14 @@ import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
+import edu.wpi.first.wpilibj2.command.Subsystem;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine.Direction;
@@ -27,8 +29,8 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 public class RobotContainer {
-    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
-    public double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
+    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * 0.5; // kSpeedAt12Volts desired top speed
+    public double MaxAngularRate = RotationsPerSecond.of(0.5    ).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
     /* Setting up bindings for necessary control of the swerve drive platform */
     public final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
@@ -36,11 +38,11 @@ public class RobotContainer {
             .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
     public final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
 
-    private final Telemetry logger = new Telemetry(MaxSpeed);
-
     public final CommandXboxController joystick = new CommandXboxController(0);
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
+
+    private final SendableChooser<Command> autoChooser = new SendableChooser<>();
 
     // joystick command configs
     // TODO: move joystick command to seperate command file
@@ -48,9 +50,24 @@ public class RobotContainer {
     private static final double ROT_DEADBAND = 0.03;
     private static final double kDrive = 5;
     private static final double kRot = 7;
+    public static final Subsystem Drivetrain = null;
 
     public RobotContainer() {
         configureBindings();
+        configureAutos();
+    }
+
+    private void configureAutos() {
+        autoChooser.setDefaultOption("NOTHING", Commands.none());
+        autoChooser.addOption("OneMeterForward", new DriveToPoseCommand(drivetrain, drive, brake, 1, 0, 0, MaxSpeed, MaxAngularRate));
+        autoChooser.addOption("OneMeterSquare", Commands.sequence(
+            new DriveToPoseCommand(drivetrain, drive, brake, -2, 0, 0, MaxSpeed, MaxAngularRate), // backward 0.5m
+            new DriveToPoseCommand(drivetrain, drive, brake, 0, -2, 0, MaxSpeed, MaxAngularRate), // move right 0.5m
+            new DriveToPoseCommand(drivetrain, drive, brake, 2, 0, 0, MaxSpeed, MaxAngularRate), // move forward 0.5m
+            new DriveToPoseCommand(drivetrain, drive, brake, 0, 2, 0, MaxSpeed, MaxAngularRate) // move left 0.5m
+        ));
+
+        SmartDashboard.putData("AUTO SELECTOR", autoChooser);
     }
 
     private void configureBindings() {
@@ -90,52 +107,28 @@ public class RobotContainer {
                 double[] vel = drivetrain.calculateDriveToPose(start);
                 if (vel == null) return brake;
 
-                SmartDashboard.putNumber("x", vel[0]);
-                SmartDashboard.putNumber("y", vel[1]);
-                SmartDashboard.putNumber("r", vel[2]);
+                // smooth out speeds using logarithmic scaling like joysticks
+                double vx = logScale(vel[0], DRIVE_DEADBAND, kDrive);
+                double vy = logScale(vel[1], DRIVE_DEADBAND, kDrive);
+                double o = logScale(vel[2], ROT_DEADBAND, kRot);
 
-                return drive.withVelocityX(vel[0] * MaxSpeed/2)
-                            .withVelocityY(vel[1] * MaxSpeed/2)
-                            .withRotationalRate(vel[2] * MaxAngularRate);
+                SmartDashboard.putNumber("x", vx);
+                SmartDashboard.putNumber("y", vy);
+                SmartDashboard.putNumber("r", o);
+
+                // travel to home at 40% speed, rotate at 60% rate
+                return drive.withVelocityX(vx * (MaxSpeed * 0.4))
+                            .withVelocityY(vy * (MaxSpeed * 0.4))
+                            .withRotationalRate(o * (MaxAngularRate * 0.6));
             })
         );
 
-
-        // joystick.a().whileTrue(drivetrain.applyRequest(() -> brake));
-        // joystick.b().whileTrue(drivetrain.applyRequest(() ->
-        //     point.withModuleDirection(new Rotation2d(-joystick.getLeftY(), -joystick.getLeftX()))
-        // ));
-
-        // Run SysId routines when holding back/start and X/Y.
-        // Note that each routine should be run exactly once in a single log.
-        // joystick.back().and(joystick.y()).whileTrue(drivetrain.sysIdDynamic(Direction.kForward));
-        // joystick.back().and(joystick.x()).whileTrue(drivetrain.sysIdDynamic(Direction.kReverse));
-        // joystick.start().and(joystick.y()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kForward));
-        // joystick.start().and(joystick.x()).whileTrue(drivetrain.sysIdQuasistatic(Direction.kReverse));
-
         // reset the field-centric heading on left bumper press
         joystick.leftBumper().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
-
-        // drivetrain.registerTelemetry(logger::telemeterize);
     }
 
     public Command getAutonomousCommand() {
-        return Commands.sequence(
-          new DriveToPoseCommand(drivetrain, drive, brake, -1, 0, 0, MaxSpeed, MaxAngularRate), // backward 0.5m
-          new DriveToPoseCommand(drivetrain, drive, brake, 0, -1, 0, MaxSpeed, MaxAngularRate), // move right 0.5m
-          new DriveToPoseCommand(drivetrain, drive, brake, 1, 0, 0, MaxSpeed, MaxAngularRate), // move forward 0.5m
-          new DriveToPoseCommand(drivetrain, drive, brake, 0, 1, 0, MaxSpeed, MaxAngularRate) // move left 0.5m
-        );
-
-        // return new DriveToPoseCommand(drivetrain, drive, brake, 1, 0, 0, MaxSpeed, MaxAngularRate);
-
-        // return new DriveDistance(drivetrain, 0.2, 2, MaxSpeed, MaxAngularRate);
-
-        // return new SequentialCommandGroup(
-        //   new InstantCommand(() -> driveDistance(1))  
-        // );
-
-        // return Commands.print("No autonomous command configured");
+        return autoChooser.getSelected();
     }
 
     private static double logScale(double in, double deadband, double k) {
