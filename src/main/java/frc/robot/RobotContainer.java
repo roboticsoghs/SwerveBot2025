@@ -27,12 +27,12 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 public class RobotContainer {
-    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * 0.5; // kSpeedAt12Volts desired top speed
-    public double MaxAngularRate = RotationsPerSecond.of(0.5).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
+    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
+    public double MaxAngularRate = RotationsPerSecond.of(0.75).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
     /* Setting up bindings for necessary control of the swerve drive platform */
     public final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
-            .withDeadband(MaxSpeed * 0.1).withRotationalDeadband(MaxAngularRate * 0.1) // Add a 10% deadband
+            .withDeadband(MaxSpeed * 0.05).withRotationalDeadband(MaxAngularRate * 0.07) // Add a 5% deadband to drive and 7% to rotation
             .withDriveRequestType(DriveRequestType.OpenLoopVoltage); // Use open-loop control for drive motors
     public final SwerveRequest.SwerveDriveBrake brake = new SwerveRequest.SwerveDriveBrake();
 
@@ -41,6 +41,13 @@ public class RobotContainer {
     public final CommandXboxController joystick = new CommandXboxController(0);
 
     public final CommandSwerveDrivetrain drivetrain = TunerConstants.createDrivetrain();
+
+    // joystick command configs
+    // TODO: move joystick command to seperate command file
+    private static final double DRIVE_DEADBAND = 0.03;
+    private static final double ROT_DEADBAND = 0.03;
+    private static final double kDrive = 5;
+    private static final double kRot = 7;
 
     public RobotContainer() {
         configureBindings();
@@ -51,11 +58,20 @@ public class RobotContainer {
         // and Y is defined as to the left according to WPILib convention.
         drivetrain.setDefaultCommand(
             // Drivetrain will execute this command periodically
-            drivetrain.applyRequest(() ->
-                drive.withVelocityX(-joystick.getLeftY() * MaxSpeed) // Drive forward with negative Y (forward)
-                    .withVelocityY(-joystick.getLeftX() * MaxSpeed) // Drive left with negative X (left)
-                    .withRotationalRate(-joystick.getRightX() * MaxAngularRate) // Drive counterclockwise with negative X (left)
-            )
+            drivetrain.applyRequest(() -> {
+                double vx = logScale(-joystick.getLeftY(), DRIVE_DEADBAND, kDrive);
+                double vy = logScale(-joystick.getLeftX(), DRIVE_DEADBAND, kDrive);
+                double o = logScale(-joystick.getRightX(), ROT_DEADBAND, kRot);
+
+                SmartDashboard.putNumber("VelocityX Setpoint", vx * MaxSpeed);
+                SmartDashboard.putNumber("VelocityY Setpoint", vy * MaxSpeed);
+                SmartDashboard.putNumber("Omega Setpoint", o * MaxAngularRate);
+
+                return drive
+                    .withVelocityX(vx * MaxSpeed)
+                    .withVelocityY(vy * MaxSpeed)
+                    .withRotationalRate(o * MaxAngularRate);
+            })
         );
 
         // Idle while the robot is disabled. This ensures the configured
@@ -120,5 +136,14 @@ public class RobotContainer {
         // );
 
         // return Commands.print("No autonomous command configured");
+    }
+
+    private static double logScale(double in, double deadband, double k) {
+        if (Math.abs(in) < deadband) return 0.0;
+
+        double sign = Math.signum(in);
+        double a = (Math.abs(in) - deadband) / (1.0 - deadband);
+        double scaled = Math.log1p(k * a) / Math.log1p(k);
+        return sign * scaled;
     }
 }
