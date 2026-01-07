@@ -29,8 +29,8 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 
 public class RobotContainer {
-    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond) * 0.5; // kSpeedAt12Volts desired top speed
-    public double MaxAngularRate = RotationsPerSecond.of(0.5    ).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
+    public double MaxSpeed = TunerConstants.kSpeedAt12Volts.in(MetersPerSecond); // kSpeedAt12Volts desired top speed
+    public double MaxAngularRate = RotationsPerSecond.of(0.75    ).in(RadiansPerSecond); // 3/4 of a rotation per second max angular velocity
 
     /* Setting up bindings for necessary control of the swerve drive platform */
     public final SwerveRequest.FieldCentric drive = new SwerveRequest.FieldCentric()
@@ -65,6 +65,12 @@ public class RobotContainer {
             new DriveToPoseCommand(drivetrain, drive, brake, 0, -2, 0, MaxSpeed, MaxAngularRate), // move right 0.5m
             new DriveToPoseCommand(drivetrain, drive, brake, 2, 0, 0, MaxSpeed, MaxAngularRate), // move forward 0.5m
             new DriveToPoseCommand(drivetrain, drive, brake, 0, 2, 0, MaxSpeed, MaxAngularRate) // move left 0.5m
+        ));
+        autoChooser.addOption("Surprise", Commands.sequence(
+            new DriveToPoseCommand(drivetrain, drive, brake, 0, 1, 0, MaxSpeed, MaxAngularRate), 
+            new DriveToPoseCommand(drivetrain, drive, brake, -2, 0, 0, MaxSpeed, MaxAngularRate), 
+            new DriveToPoseCommand(drivetrain, drive, brake, 0, -1, 0, MaxSpeed, MaxAngularRate), 
+            new DriveToPoseCommand(drivetrain, drive, brake, 2, 0, 0, MaxSpeed, MaxAngularRate) 
         ));
 
         SmartDashboard.putData("AUTO SELECTOR", autoChooser);

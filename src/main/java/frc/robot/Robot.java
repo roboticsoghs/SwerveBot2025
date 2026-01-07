@@ -4,6 +4,9 @@
 
 package frc.robot;
 
+import edu.wpi.first.networktables.NetworkTable;
+import edu.wpi.first.networktables.NetworkTableEntry;
+import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -15,6 +18,18 @@ public class Robot extends TimedRobot {
   private Command m_autonomousCommand;
 
   public final RobotContainer m_robotContainer;
+
+  NetworkTable table = NetworkTableInstance.getDefault().getTable("limelight");
+  NetworkTableEntry cameraPose = table.getEntry("targetpose_cameraspace");
+  
+  private double x;
+  private double y;
+  private double z;
+  private double pitch;
+  private double yaw;
+  private double roll;
+  private long aprilTagId;
+  private double[] camera = new double[6];
 
   public Robot() {
     m_robotContainer = new RobotContainer();
@@ -29,6 +44,32 @@ public class Robot extends TimedRobot {
     SmartDashboard.putNumber("Actual VelocityX", m_robotContainer.drivetrain.getState().Speeds.vxMetersPerSecond);
     SmartDashboard.putNumber("Actual VelocityY", m_robotContainer.drivetrain.getState().Speeds.vyMetersPerSecond);
     SmartDashboard.putNumber("Actual Omega", m_robotContainer.drivetrain.getState().Speeds.omegaRadiansPerSecond);
+
+    double[] defaultValue = {0,0,0,0,0,0}; // default value required by getDoubleArray
+    camera = cameraPose.getDoubleArray(defaultValue);
+    long defaultValueID = 0;
+    aprilTagId = table.getEntry("tid").getInteger(defaultValueID);
+
+    // limelight 3D offsets relative to camera
+    x = camera[0]; // in meters
+    y = camera[1]; // in meters
+    z = camera[2]; // distance in meters
+    pitch = camera[3];
+    yaw = camera[4];
+    roll = camera[5];
+
+    // angleX = ca
+
+    //post to smart dashboard periodically
+    SmartDashboard.putNumber("LimelightX", x);
+    SmartDashboard.putNumber("LimelightY", y);
+    SmartDashboard.putNumber("LimelightZ", z);
+
+    SmartDashboard.putNumber("Limelight Pitch", pitch);
+    SmartDashboard.putNumber("Limelight Yaw", yaw);
+    SmartDashboard.putNumber("Limelight Roll", roll);
+
+    SmartDashboard.putNumber("AprilTag ID", aprilTagId);
   }
 
   @Override
